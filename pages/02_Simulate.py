@@ -16,7 +16,7 @@ st.title('🖥️Simulate')
 
 # Function definitions
 
-# Function to create 2R network
+# Function to create 2R network - to be replaced with built-in method
 def create_2R_network_BC(object_handle, power, rjb, rjc, board_side):
     """ Function to create 2-Resistor network object
         Parameters
