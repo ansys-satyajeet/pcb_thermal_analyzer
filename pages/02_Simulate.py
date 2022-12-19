@@ -326,12 +326,21 @@ def import_ecad(ecad_file_path, ecad_type):
     
     h3d.save_project()
     ecad_design = h3d.design_list[0]
+
+    # Get name of outline polygon
+    outline_poly = []
+    for key in h3d.modeler.polygons.keys():
+        if h3d.modeler.polygons[key].placement_layer == 'Outline':
+            outline_poly.append(key)
+
     ipk.create_pcb_from_3dlayout(component_name=ecad_file_name_no_ext,
                                     project_name=ecad_project_path,
                                     design_name=ecad_design,
                                     close_linked_project_after_import=True,
-                                    extenttype='Bounding Box',
+                                    extenttype='Polygon',
+                                    outlinepolygon=outline_poly[0],
                                     resolution=3)
+                                    
     for i in ipk.design_list:
         design = desktop.design_type(project_name=ipk.project_name,design_name=i)
         if design != 'Icepak':
@@ -341,6 +350,11 @@ def quit_aedt():
     ipk.save_project()
     pid = desktop.aedt_process_id
     os.kill(pid,signal.SIGTERM)
+    files = os.listdir(os.getcwd())
+    for file in files:
+        if file.endswith('.lock'):
+            os.remove(file)
+    
 
 # Fix blur issue in tkinter window panels
 from ctypes import windll
@@ -554,9 +568,9 @@ aedt_version = st.selectbox('Select AEDT release:', ('2022 R2','2023 R1'))
 
 analyze_setup = st.checkbox('Setup problem and proceed to solve')
 if analyze_setup:
-    sim_button_text = 'Simulate'
+    sim_button_text = '**Simulate**'
 else:
-    sim_button_text = 'Setup Only'
+    sim_button_text = '**Setup Only**'
 setup_analyze = st.button(sim_button_text)
 
 
@@ -588,12 +602,14 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
     project_name = project_name + '.aedt'
     project_path = os.path.join(os.getcwd(), project_name)
     if setup_analyze:
-        if aedt_version == '2022 R2':
-            aedt_release = '2022.2'
-        elif aedt_version == '2023 R1':
-            aedt_release = '2023.1'
-        else:
-            aedt_release = '2022.2'
+        # if aedt_version == '2022 R2':
+        #     aedt_release = '2022.2'
+        # elif aedt_version == '2023 R1':
+        #     aedt_release = '2023.1'
+        # else:
+        #     aedt_release = '2022.2'
+
+        aedt_release = re.sub(' R', '.', aedt_version)
 
         cleanup_files(project_name)
         placeholder.info('AEDT Icepak session in progress...', icon="🏃🏽")
@@ -603,9 +619,62 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         else:
             non_graphical_mode = True
 
+        # Start AEDT Desktop session
         desktop = pyaedt.Desktop(aedt_release, non_graphical=non_graphical_mode)
-        ipk = pyaedt.Icepak(project_path)
+
+        # Import ECAD file
+        # import_ecad(ecad_file_path=st.session_state['ecad_file'], ecad_type=st.session_state['ecad_type'])
+
+        # Insert ECAD Import code
+        ecad_file_path=st.session_state['ecad_file']
+        ecad_type=st.session_state['ecad_type']
+        ecad_file_name = os.path.basename(ecad_file_path)
+        ecad_file_name_no_ext = os.path.splitext(ecad_file_name)[0]
+
+        ecad_project_name = ecad_file_name_no_ext + '.aedt'
+        ecad_project_path = os.path.join(os.getcwd(), ecad_project_name)
+        ecad_project_name_no_ext = os.path.splitext(ecad_project_name)[0]
+
+        cleanup_files(ecad_project_name)
+
+        h3d = pyaedt.Hfss3dLayout()
+        if ecad_type == 'EDB Folder':
+            h3d.import_edb(ecad_file_path)
+        if ecad_type == 'ODB++ File':
+            h3d.import_odb(ecad_file_path)
+        if ecad_type == 'BRD File':
+            h3d.import_brd(ecad_file_path)
+        
+        h3d.save_project()
+
+        # Delete empty project
+        project_list = desktop.project_list()
+        for i in project_list:
+            if i != ecad_file_name_no_ext:
+                desktop.odesktop.DeleteProject(i)
+
+        ecad_design = h3d.design_list[0]
+
+        # Get name of outline polygon
+        outline_poly = []
+        for key in h3d.modeler.polygons.keys():
+            if h3d.modeler.polygons[key].placement_layer == 'Outline':
+                outline_poly.append(key)
+
+        ipk = pyaedt.Icepak()
         ipk.save_project()
+
+        # project_path = os.path.join(os.getcwd(), project_name)
+        ipk.oproject.Rename(os.path.join(ipk.project_path, project_name), True)
+
+        # Create PCB object in Icepak
+        ipk.create_pcb_from_3dlayout(component_name=ecad_file_name_no_ext,
+                                        project_name=None,
+                                        design_name=ecad_design,
+                                        close_linked_project_after_import=False,
+                                        extenttype='Polygon',
+                                        outlinepolygon=outline_poly[0],
+                                        resolution=3)
 
         # Import IDF file
         ipk.import_idf(board_filename)
@@ -653,6 +722,43 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                 mat.thermal_conductivity = i[1]
                 mat.update()
 
+        # Delete empty part numbers/NOREFDES instances
+        for i in ipk.modeler.solid_bodies:
+            if i.startswith('idf_mech'):
+                ipk.modeler.delete(i)
+
+        # Remove any gap between board and components
+        top_components = []
+        bottom_components = []
+        for i in range(len(rows)):
+            if rows[i][3] != 'NOREFDES':
+                block_name = re.sub("\W", "_", rows[i][3])
+                if rows[i][6] == 'TOP':
+                    top_components.append(block_name)
+                if rows[i][6] == 'BOTTOM':
+                    bottom_components.append(block_name)
+
+        tc_z = ipk.modeler.get_object_from_name(top_components[0]).bottom_face_z.center[2]
+        bc_z = ipk.modeler.get_object_from_name(bottom_components[0]).top_face_z.center[2]
+
+        pcb = ipk.modeler.primitives.user_defined_component_names
+        pcb_layers = sorted(ipk.modeler.get_3d_component_object_list(pcb[0]))
+        top_layer_z_bound = ipk.modeler.get_object_from_name(pcb_layers[0]).top_face_z.center[2]
+        bottom_layer_z_bound = ipk.modeler.get_object_from_name(pcb_layers[-1]).bottom_face_z.center[2]
+
+        move_top = tc_z - top_layer_z_bound
+        if move_top > 0:
+            ipk.modeler.move(objid=top_components, vector=[0, 0, -move_top])
+        else:
+            ipk.modeler.move(objid=top_components, vector=[0, 0, move_top])
+
+        move_bottom = bc_z - bottom_layer_z_bound
+        if move_bottom < 0:
+            ipk.modeler.move(objid=bottom_components, vector=[0, 0, -move_bottom])
+        else:
+            ipk.modeler.move(objid=bottom_components, vector=[0, 0, move_bottom])
+
+        
         ## Create monitor points
         points_list = []
         mon_point_list = []
@@ -775,7 +881,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         ipk.save_project()
 
         # Import ECAD file
-        import_ecad(ecad_file_path=st.session_state['ecad_file'], ecad_type=st.session_state['ecad_type'])
+        # import_ecad(ecad_file_path=st.session_state['ecad_file'], ecad_type=st.session_state['ecad_type'])
 
         # Make board that comes with the IDF file as non-model object
         board_handle = ipk.modeler.get_object_from_name('IDF_BoardOutline')
@@ -846,34 +952,62 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
 
 
         desktop.clear_messages()
+
+        # Priority assignments based on volume of objects
+        obj_dict = {}
+        for i in ipk.modeler.solid_bodies:
+            if i != 'Region':
+                obj_dict[i] = ipk.modeler.get_object_from_name(i).volume
+        vol_sorted_objs = sorted(obj_dict.items(), key=lambda x:x[1], reverse=True)
+        vol_sorted_obj_list = []
+        for i in vol_sorted_objs:
+            vol_sorted_obj_list.append(i[0])
+        
+        priority_num = 2
+        args = ["NAME:UpdatePriorityListData"]
+        for i in vol_sorted_obj_list:
+            if i != 'Region':
+                prio = [
+                    "NAME:PriorityListParameters",
+                    "EntityType:=", "Object",
+                    "EntityList:=", i,
+                    "PriorityNumber:=", priority_num,
+                    "PriorityListType:=", "3D"
+                ]
+                args.append(prio)
+                priority_num = priority_num + 1
+        ipk.modeler.oeditor.UpdatePriorityList(args)
+
+
         # Validation Check for Icepak design
-        ipk.odesign.ValidateDesign()
-        x = ipk.odesktop.GetMessages(ipk.project_name, ipk.design_name, 2)
-        desktop.clear_messages()
-        intersecting_objs = re.findall('Parts\s"(.*?)"\sand\s"(.*?)"\sintersect', ''.join(x))
-        p = 2
-        for i in intersecting_objs:
-            obj_list = [i[0]]
-            p = p + 1
-            ipk.mesh.add_priority(1,obj_list,"None",p)
-        ipk.save_project()
+        # ipk.odesign.ValidateDesign()
+        # x = ipk.odesktop.GetMessages(ipk.project_name, ipk.design_name, 2)
+        # desktop.clear_messages()
+        # intersecting_objs = re.findall('Parts\s"(.*?)"\sand\s"(.*?)"\sintersect', ''.join(x))
+        # p = 2
+        # for i in intersecting_objs:
+        #     obj_list = [i[0]]
+        #     p = p + 1
+        #     ipk.mesh.add_priority(1,obj_list,"None",p)
+        # ipk.save_project()
 
         # List of objects
-        list_of_objects = ipk.modeler.solid_bodies
-        model_objects = []
-        for i in list_of_objects:
-            obj_handle = ipk.modeler.get_object_from_name(i)
-            if obj_handle.model == True:
-                model_objects.append(i)
+        # list_of_objects = ipk.modeler.solid_bodies
+        # model_objects = []
+        # for i in list_of_objects:
+        #     obj_handle = ipk.modeler.get_object_from_name(i)
+        #     if obj_handle.model == True:
+        #         model_objects.append(i)
+        model_objects = ipk.modeler.model_objects
         model_objects.remove('Region')
 
         # 3D Components 
-        comp3d_name = ipk.odesign.GetChildObject('3D Modeler').Get3DComponentDefinitionNames()[0]
-        comp3d_instance_name = ipk.odesign.GetChildObject('3D Modeler').Get3DComponentInstanceNames(comp3d_name)[0]
-        comp3d_part_names = list(ipk.odesign.GetChildObject('3D Modeler').Get3DComponentPartNames(comp3d_instance_name))
+        # comp3d_name = ipk.odesign.GetChildObject('3D Modeler').Get3DComponentDefinitionNames()[0]
+        # comp3d_instance_name = ipk.odesign.GetChildObject('3D Modeler').Get3DComponentInstanceNames(comp3d_name)[0]
+        # comp3d_part_names = list(ipk.odesign.GetChildObject('3D Modeler').Get3DComponentPartNames(comp3d_instance_name))
 
         # List of primitive objects
-        primitive_objects = [x for x in model_objects if x not in comp3d_part_names]
+        primitive_objects = [x for x in model_objects if x not in pcb_layers]
 
         # Set mesh dimensions
         dim_x = []
@@ -883,17 +1017,17 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
             obj_handle = ipk.modeler.get_object_from_name(i)
             dim_x.append(obj_handle.bounding_dimension[0])
             dim_y.append(obj_handle.bounding_dimension[1])
-        for i in comp3d_part_names:
+        for i in pcb_layers:
             obj_handle = ipk.modeler.get_object_from_name(i)
             dim_z.append(obj_handle.bounding_dimension[2])
 
-        pcb_dim_x = ipk.modeler.get_object_from_name(comp3d_part_names[0]).bounding_dimension[0]
-        pcb_dim_y = ipk.modeler.get_object_from_name(comp3d_part_names[0]).bounding_dimension[1]
-        pcb_dim_z = sum(dim_z)
-        pcb_min_x = ipk.modeler.get_object_from_name(comp3d_part_names[0]).bounding_box[0]
-        pcb_min_y = ipk.modeler.get_object_from_name(comp3d_part_names[0]).bounding_box[1]
-        pcb_max_x = ipk.modeler.get_object_from_name(comp3d_part_names[0]).bounding_box[3]
-        pcb_max_y = ipk.modeler.get_object_from_name(comp3d_part_names[0]).bounding_box[4]
+        pcb_dim_x = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_dimension[0]
+        pcb_dim_y = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_dimension[1]
+        # pcb_dim_z = sum(dim_z)
+        pcb_min_x = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_box[0]
+        pcb_min_y = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_box[1]
+        pcb_max_x = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_box[3]
+        pcb_max_y = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_box[4]
 
         tx = np.histogram(dim_x, bins=10)
         ty = np.histogram(dim_y, bins=10)
@@ -970,15 +1104,18 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
 
         # Add mesh operation to primitives, mesh level = 1
         mesh_levels_3dcomps = {}
-        for i in comp3d_part_names:
+        for i in pcb_layers:
             mesh_levels_3dcomps[i] = 1
         ipk.mesh.assign_mesh_level(mesh_levels_3dcomps,"mesh_levels_pcb_layers")
 
         # Global mesh dimensions
         domain = ipk.modeler.get_bounding_dimension()
-        global_max_x = domain[0]/25
-        global_max_y = domain[1]/25
-        global_max_z = domain[2]/25
+        # global_max_x = domain[0]/25
+        # global_max_y = domain[1]/25
+        # global_max_z = domain[2]/25
+        global_max_x = 4*mesh_x
+        global_max_y = 4*mesh_y
+        global_max_z = 4*mesh_z
 
         # Apply global mesh settings.
         ipk.mesh.global_mesh_region.UserSpecifiedSettings = True
@@ -1021,5 +1158,9 @@ if st.session_state['pid']:
     if close_aedt:
         try:
             os.kill(st.session_state['pid'],signal.SIGTERM)
+            files = os.listdir(os.getcwd())
+            for file in files:
+                if file.endswith('.lock'):
+                    os.remove(file)
         except:
             st.warning('⚠️ No active AEDT sessions!')
