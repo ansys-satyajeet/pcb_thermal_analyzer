@@ -9,7 +9,7 @@ and type the following the command:
 pip install -r requirements.txt
 ```
 
-In the directory containing the files and folder, type the following command in the command prompt:
+In the command prompt, point to the directory containing the app files and type in the following command:
 
 ```python
 python pcb_thermal_analyzer.py
