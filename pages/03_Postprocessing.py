@@ -1,10 +1,10 @@
 import os
 import signal
+import pyaedt
 import numpy as np
 import pandas as pd
 import streamlit as st
 import tkinter as tk
-import pyaedt
 from tkinter import filedialog
 
 st.set_page_config(layout="centered", page_icon="🌡️", page_title="PCB Thermal Analyzer")
@@ -170,9 +170,16 @@ def get_object_max_temperatures(solution_name):
     return df
 
 def quit_aedt():
-    st.session_state.ipk.save_project()
-    pid = st.session_state.desktop.aedt_process_id
-    os.kill(pid,signal.SIGTERM)
+    if st.session_state.desktop:
+        st.session_state.ipk.save_project()
+        pid = st.session_state.desktop.aedt_process_id
+        os.kill(pid,signal.SIGTERM)
+        files = os.listdir(os.getcwd())
+        for file in files:
+            if file.endswith('.lock'):
+                os.remove(file)
+    else:
+        st.warning('⚠️ No active AEDT sessions open!')
 
 
 if 'desktop' not in st.session_state:
@@ -206,8 +213,9 @@ if aedt_project_button:
     except:
         st.session_state.project = False
 
-workdir = os.path.dirname(os.path.abspath(st.session_state.project))
-os.chdir(workdir)
+if st.session_state.project:
+    workdir = os.path.dirname(os.path.abspath(st.session_state.project))
+    os.chdir(workdir)
 
 
 placeholder = st.empty()
@@ -225,19 +233,20 @@ elif aedt_version == '2023 R1':
 else:
     aedt_release = '2022.2'
 
-post_tuple = ('Monitor Point Temperatures','Network Junction Temperatures','Object Temperatures','Temperature Contours on PCB Layers',
-                'Temperature Contours on Entire Model','Heat Flow Rates at Object-PCB Interfaces')
+post_tuple = ('Monitor Point Temperatures', 'Network Junction Temperatures', 'Object Temperatures',
+                'Temperature Contours on PCB Layers', 'Temperature Contours on Entire Model',
+                'Heat Flow Rates at Object-PCB Interfaces')
 st.session_state.post_quant = st.selectbox('Postprocessing selection:', post_tuple)
 
 st.session_state.create_report = st.button('Create Report')
 
-if st.session_state.launch_aedt:
+if st.session_state.launch_aedt and st.session_state.desktop:
     if os.path.exists(os.path.join(os.getcwd(),st.session_state.project + ".lock")):
         os.remove(os.path.join(os.getcwd(),st.session_state.project + ".lock"))
     st.session_state.desktop = pyaedt.Desktop(aedt_release)
     st.session_state.ipk = pyaedt.Icepak(st.session_state.project)
 
-if st.session_state.create_report:
+if st.session_state.create_report and st.session_state.desktop:
     if st.session_state.post_quant== 'Monitor Point Temperatures':
         solution_name = get_solution_name()
         mon_df = get_monitor_point_temperatures(solution_name)
@@ -256,3 +265,5 @@ if st.session_state.create_report:
 st.session_state.close_aedt = st.button('Save and Quit AEDT')
 if st.session_state.close_aedt:
     quit_aedt()
+else:
+    st.warning('⚠️ No active AEDT sessions open!')
