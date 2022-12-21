@@ -950,7 +950,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                 outlet_name = 'outlet_' + str(i)
                 assign_opening_BC(outlet_name, i, flow_type='pressure')
 
-
+        # Clear Desktop messages
         desktop.clear_messages()
 
         # Priority assignments based on volume of objects
