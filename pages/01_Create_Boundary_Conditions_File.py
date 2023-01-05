@@ -4,15 +4,14 @@ import pandas as pd
 import streamlit as st
 import tkinter as tk
 from tkinter import filedialog
+from ctypes import windll
 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
 
 st.set_page_config(layout="centered", page_icon="🌡️", page_title="PCB Thermal Analyzer")
 st.title('📝Create Boundary Conditions File')
 
 # Fix blur issue in tkinter window panels
-from ctypes import windll
 windll.shcore.SetProcessDpiAwareness(1)
-
 
 if 'idf' not in st.session_state:
     st.session_state['idf'] = False
@@ -41,8 +40,7 @@ if 'mat_dataframe' not in st.session_state:
 if 'workdir' not in st.session_state:
     st.session_state['workdir'] = False
 
-
-c1, c2 = st.columns([3,1])
+c1, c2 = st.columns([3, 1])
 c1.markdown(f'''**Select working directory:**''')
 workdir_button = c2.button('Select Folder')
 if workdir_button:
@@ -53,7 +51,7 @@ if workdir_button:
     try:
         workdir = filedialog.askdirectory(master=root0)
         st.session_state['workdir'] = workdir
-    except:
+    except RuntimeWarning:
         pass
 
 if st.session_state['workdir']:
@@ -65,11 +63,11 @@ if st.session_state['workdir']:
 else:
     ph0.markdown(f'''📁 ```{os.getcwd()}```''')
 
-# Read board file from windows explorer dialog box
+# Read board file from Windows Explorer dialog box
 #
-col01, col02, col03 = st.columns([2,1,1])
+col01, col02, col03 = st.columns([2, 1, 1])
 col01.markdown(f'''**Select IDF Board file:**''')
-idf_type = col02.selectbox('Select IDF Board file type:', ('*.emn','*.bdf'), label_visibility='collapsed')
+idf_type = col02.selectbox('Select IDF Board file type:', ('*.emn', '*.bdf'), label_visibility='collapsed')
 idf_button = col03.button('Select Board File')
 if idf_button:
     st.session_state['idf'] = True
@@ -78,13 +76,14 @@ if idf_button:
     root1.withdraw()
     try:
         if idf_type == '*.emn':
-            files = filedialog.askopenfilenames(master=root1,filetypes=[('EMN File','*.emn')])
+            files = filedialog.askopenfilenames(master=root1, filetypes=[('EMN File', '*.emn')])
         if idf_type == '*.bdf':
-            files = filedialog.askopenfilenames(master=root1,filetypes=[('BDF File', '*.bdf')])
+            files = filedialog.askopenfilenames(master=root1, filetypes=[('BDF File', '*.bdf')])
         idf_file = os.path.basename(files[0])
         st.session_state['idf_file'] = idf_file
-    except:
+    except RuntimeWarning:
         pass
+
 # Placeholder for IDF file input information
 ph1 = st.empty()
 if st.session_state['idf_file']:
@@ -92,11 +91,11 @@ if st.session_state['idf_file']:
 else:
     ph1.markdown(f'''⚠️*No IDF file selected.*''')
 
-# Read board file from windows explorer dialog box
+# Read board file from Windows Explorer dialog box
 #
 include_matfile = st.checkbox(f'''**Read Materials as CSV File?**''')
 if include_matfile:
-    col04, col05 = st.columns([3,1])
+    col04, col05 = st.columns([3, 1])
     col04.markdown(f'''**Please select materials CSV file:**''')
     matfile_button = col05.button('Select CSV File')
     if matfile_button:
@@ -105,17 +104,17 @@ if include_matfile:
         root2.attributes("-topmost", True)
         root2.withdraw()
         try:
-            files = filedialog.askopenfilenames(master=root2,filetypes=[('Microsoft Excel Comma Separated Values File','*.csv')])
+            files = filedialog.askopenfilenames(master=root2,
+                                                filetypes=[('Microsoft Excel Comma Separated Values File', '*.csv')])
             mat_csvfile = os.path.basename(files[0])
             st.session_state['mat_csvfile'] = mat_csvfile
-        except:
+        except RuntimeWarning:
             pass
     ph2 = st.empty()
     if st.session_state['mat_csvfile']:
         ph2.markdown(f'''📝 ```{os.path.abspath(st.session_state['mat_csvfile'])}```''')
     else:
         ph2.markdown(f'''⚠️*No Materials CSV file selected.*''')
-
 
 if st.session_state['idf_file']:
     filename_no_ext = os.path.splitext(st.session_state['idf_file'])[0]
@@ -131,7 +130,7 @@ if st.session_state['idf_file']:
     # Generate CSV of boundary conditions
     st.markdown('**Generate boundary conditions table as CSV file**')
     st.session_state['generate_bc_csv'] = st.button('Generate')
-    
+
     if st.session_state['generate_bc_csv']:
         # Board components
         components = []
@@ -155,7 +154,7 @@ if st.session_state['idf_file']:
             else:
                 n = re.findall(r'[^"\s]\S*|".+?"', component_names[i])
             if n[1] == '""':
-                n[1] = 'NOPARTNAME'  
+                n[1] = 'NOPARTNAME'
             p = list(filter(None, component_placement[i].split(' ')))
             p = p[4]
             n.append(p)
@@ -168,15 +167,16 @@ if st.session_state['idf_file']:
         # Export designator list as csv
         st.session_state['idf_csv_file'] = filename_no_ext + '_bcs.csv'
         with open(st.session_state['idf_csv_file'], 'w') as f:
-            header = 'Include,Package_Name,Part_Name,Instance_Name,Placement,BC_Type,Power [W],R_jb [C/W],R_jc [C/W],Monitor_Point,Material\n'
+            header = 'Include,Package_Name,Part_Name,Instance_Name,Placement,BC_Type,Power [W],R_jb [C/W],R_jc [C/W],' \
+                     'Monitor_Point,Material\n'
             f.write(header)
             for i in designator_list:
-                line = 'YES,' + ','.join(map(str,i)) + ',block,0,0,0,NO,Ceramic_material\n'
+                line = 'YES,' + ','.join(map(str, i)) + ',block,0,0,0,NO,Ceramic_material\n'
                 f.write(line)
 
         # Add reference designator type and height information
         df = pd.read_csv(st.session_state['idf_csv_file'])
-        refdes = df.iloc[:,3]
+        refdes = df.iloc[:, 3]
         destype = []
         for i in refdes:
             if re.match(r'^U\d', i):
@@ -200,62 +200,67 @@ if st.session_state['idf_file']:
         with open(lib_file) as emp:
             for line in emp:
                 if line.startswith('.ELECTRICAL'):
-                    l = next(emp)
-                    if l.find('\"\"') > 0:
-                        n = re.findall(r'[^"\s]\S*|".+?', l)
+                    x = next(emp)
+                    if x.find('\"\"') > 0:
+                        n = re.findall(r'[^"\s]\S*|".+?', x)
                     else:
-                        n = re.findall(r'[^"\s]\S*|".+?"', l)
+                        n = re.findall(r'[^"\s]\S*|".+?"', x)
                     if n[1] == '""':
                         n[1] = 'NOPARTNAME'
                     comp_hts.append(n)
-        
+
         for i in comp_hts:
             i.remove('THOU')
-        
+
         for i in range(len(comp_hts)):
             for j in range(len(comp_hts[i])):
                 comp_hts[i][j] = comp_hts[i][j].replace(",", "_")
 
-        part_names = df.iloc[:,2]
-        component_height = [0]*df.shape[0]
+        part_names = df.iloc[:, 2]
+        component_height = [0] * df.shape[0]
         for i in comp_hts:
             for j in range(len(part_names)):
                 if i[1] == part_names[j]:
-                    component_height[j] = float(i[2])*0.0254
-        
+                    component_height[j] = float(i[2]) * 0.0254
+
         df.insert(loc=5, column='Height [mm]', value=component_height)
 
         try:
             df.to_csv(st.session_state['idf_csv_file'], index=False)
-        except:
+        except RuntimeWarning:
             st.write('Something went wrong!')
         st.write('👍 Boundary Conditions CSV File Generated.')
-        
-
 
 if st.session_state['idf_csv_file']:
     st.info('ℹ️ To export the table as CSV, right click on any cell in table, then Export -> CSV Export.')
     st.session_state['dataframe'] = pd.read_csv(st.session_state['idf_csv_file'])
-    include_dropdownlist = ('YES','NO')
-    bc_dropdownlist = ('block','network','hollow')
-    
+    include_dropdownlist = ('YES', 'NO')
+    bc_dropdownlist = ('block', 'network', 'hollow')
+
     gb = GridOptionsBuilder.from_dataframe(st.session_state['dataframe'])
     gb.configure_default_column(editable=True)
     gb.configure_grid_options(domLayout='normal')
-    gb.configure_column('Include',editable=True,cellEditor='agSelectCellEditor',cellEditorParams={'values':include_dropdownlist},singleClickEdit=True)
-    gb.configure_column('Package_Name',editable=False)
-    gb.configure_column('Part_Name',editable=False)
-    gb.configure_column('Instance_Name',editable=False)
-    gb.configure_column('Placement',editable=False)
-    gb.configure_column('BC_Type',editable=True,cellEditor='agSelectCellEditor',cellEditorParams={'values':bc_dropdownlist},singleClickEdit=True)
-    gb.configure_column('Power [W]',editable=True,type=["numericColumn","numberColumnFilter","customNumericFormat"], precision=2)
-    gb.configure_column('R_jb [C/W]',editable=True,type=["numericColumn","numberColumnFilter","customNumericFormat"], precision=2)
-    gb.configure_column('R_jc [C/W]',editable=True,type=["numericColumn","numberColumnFilter","customNumericFormat"], precision=2)
-    gb.configure_column('Monitor_Point',editable=True,cellEditor='agSelectCellEditor',cellEditorParams={'values':include_dropdownlist},singleClickEdit=True)
+    gb.configure_column('Include', editable=True, cellEditor='agSelectCellEditor',
+                        cellEditorParams={'values': include_dropdownlist}, singleClickEdit=True)
+    gb.configure_column('Package_Name', editable=False)
+    gb.configure_column('Part_Name', editable=False)
+    gb.configure_column('Instance_Name', editable=False)
+    gb.configure_column('Placement', editable=False)
+    gb.configure_column('BC_Type', editable=True, cellEditor='agSelectCellEditor',
+                        cellEditorParams={'values': bc_dropdownlist}, singleClickEdit=True)
+    gb.configure_column('Power [W]', editable=True, type=["numericColumn", "numberColumnFilter", "customNumericFormat"],
+                        precision=2)
+    gb.configure_column('R_jb [C/W]', editable=True,
+                        type=["numericColumn", "numberColumnFilter", "customNumericFormat"], precision=2)
+    gb.configure_column('R_jc [C/W]', editable=True,
+                        type=["numericColumn", "numberColumnFilter", "customNumericFormat"], precision=2)
+    gb.configure_column('Monitor_Point', editable=True, cellEditor='agSelectCellEditor',
+                        cellEditorParams={'values': include_dropdownlist}, singleClickEdit=True)
     if st.session_state['mat_csvfile']:
         st.session_state['mat_dataframe'] = pd.read_csv(st.session_state['mat_csvfile'])
-        mat_dropdownlist = tuple(st.session_state['mat_dataframe'].iloc[:,0])
-        gb.configure_column('Material',editable=True,cellEditor='agSelectCellEditor',cellEditorParams={'values':mat_dropdownlist},singleClickEdit=True)
+        mat_dropdownlist = tuple(st.session_state['mat_dataframe'].iloc[:, 0])
+        gb.configure_column('Material', editable=True, cellEditor='agSelectCellEditor',
+                            cellEditorParams={'values': mat_dropdownlist}, singleClickEdit=True)
     grid_options = gb.build()
     grid_height = 400
     grid_response = AgGrid(
@@ -270,4 +275,3 @@ if st.session_state['idf_csv_file']:
     df = grid_response['data']
     selected = grid_response['selected_rows']
     selected_df = pd.DataFrame(selected).apply(pd.to_numeric, errors='coerce')
-               
