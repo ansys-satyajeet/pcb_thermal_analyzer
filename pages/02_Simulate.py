@@ -8,81 +8,80 @@ import numpy as np
 from ctypes import windll
 import streamlit as st
 import tkinter as tk
-from tkinter import filedialog
-from collections import OrderedDict
+from tkinter import filedialog as fd
+# from collections import OrderedDict
 
 st.set_page_config(layout="centered", page_icon="🌡️", page_title="PCB Thermal Analyzer")
 st.title('🖥️Simulate')
 
 
-# Function definitions
-
 # Function to create 2R network - to be replaced with built-in method
-def create_2R_network_BC(object_handle, power, rjb, rjc, board_side):
-    """ Function to create 2-Resistor network object
-        Parameters
-        ----------
-        object_handle: str
-            handle of the object (3D block primitive) on which 2-R network is created
-        power: float
-            junction power in [W]
-        rjb: float
-            Junction to board thermal resistance in [K/W]
-        rjc: float
-            Junction to case thermal resistance in [K/W]
-        board_side: str
-            location of board w.r.t. block. 
-            Acceptable entries are "minx","miny","minz","maxx","maxy","maxz"
-    """
-    board_side = board_side.casefold()
-    if board_side == "minx":
-        board_faceID = object_handle.bottom_face_x.id
-        case_faceID = object_handle.top_face_x.id
-        case_side = "maxx"
-    elif board_side == "maxx":
-        board_faceID = object_handle.top_face_x.id
-        case_faceID = object_handle.bottom_face_x.id
-        case_side = "minx"
-    elif board_side == "miny":
-        board_faceID = object_handle.bottom_face_y.id
-        case_faceID = object_handle.top_face_y.id
-        case_side = "maxy"
-    elif board_side == "maxy":
-        board_faceID = object_handle.top_face_y.id
-        case_faceID = object_handle.bottom_face_y.id
-        case_side = "miny"
-    elif board_side == "minz":
-        board_faceID = object_handle.bottom_face_z.id
-        case_faceID = object_handle.top_face_z.id
-        case_side = "maxz"
-    else:
-        board_faceID = object_handle.top_face_z.id
-        case_faceID = object_handle.bottom_face_z.id
-        case_side = "minz"
+# def create_2R_network_BC(object_handle, power, rjb, rjc, board_side):
+#     """ Function to create 2-Resistor network object
+#         Parameters
+#         ----------
+#         object_handle: str
+#             handle of the object (3D block primitive) on which 2-R network is created
+#         power: float
+#             junction power in [W]
+#         rjb: float
+#             Junction to board thermal resistance in [K/W]
+#         rjc: float
+#             Junction to case thermal resistance in [K/W]
+#         board_side: str
+#             location of board w.r.t. block.
+#             Acceptable entries are "minx","miny","minz","maxx","maxy","maxz"
+#     """
+#     board_side = board_side.casefold()
+#     if board_side == "minx":
+#         board_faceID = object_handle.bottom_face_x.id
+#         case_faceID = object_handle.top_face_x.id
+#         case_side = "maxx"
+#     elif board_side == "maxx":
+#         board_faceID = object_handle.top_face_x.id
+#         case_faceID = object_handle.bottom_face_x.id
+#         case_side = "minx"
+#     elif board_side == "miny":
+#         board_faceID = object_handle.bottom_face_y.id
+#         case_faceID = object_handle.top_face_y.id
+#         case_side = "maxy"
+#     elif board_side == "maxy":
+#         board_faceID = object_handle.top_face_y.id
+#         case_faceID = object_handle.bottom_face_y.id
+#         case_side = "miny"
+#     elif board_side == "minz":
+#         board_faceID = object_handle.bottom_face_z.id
+#         case_faceID = object_handle.top_face_z.id
+#         case_side = "maxz"
+#     else:
+#         board_faceID = object_handle.top_face_z.id
+#         case_faceID = object_handle.bottom_face_z.id
+#         case_side = "minz"
+#
+#     # Define network properties in props directory
+#     props = {"Faces": [board_faceID, case_faceID], "Nodes": OrderedDict(
+#         {
+#             "Case_side(" + case_side + ")": [case_faceID, "NoResistance"],
+#             "Board_side(" + board_side + ")": [board_faceID, "NoResistance"],
+#             "Internal": [power + 'W'],
+#         }
+#     ), "Links": OrderedDict(
+#         {
+#             "Rjc": ["Case_side(" + case_side + ")", "Internal", "R", str(rjc) + "cel_per_w"],
+#             "Rjb": ["Board_side(" + board_side + ")", "Internal", "R", str(rjb) + "cel_per_w"],
+#         }
+#     ), "SchematicData": ({})}
+#
+#     # Default material is Ceramic Material
+#     ipk.modeler.primitives[object_handle.name].material_name = "Ceramic_material"
+#
+#     # Create boundary condition and set Solve Inside to No
+#     bound = pyaedt.modules.Boundary.BoundaryObject(ipk, object_handle.name, props, "Network")
+#     if bound.create():
+#         ipk.boundaries.append(bound)
+#         ipk.modeler.primitives[object_handle.name].solve_inside = False
 
-    # Define network properties in props directory
-    props = {"Faces": [board_faceID, case_faceID], "Nodes": OrderedDict(
-        {
-            "Case_side(" + case_side + ")": [case_faceID, "NoResistance"],
-            "Board_side(" + board_side + ")": [board_faceID, "NoResistance"],
-            "Internal": [power + 'W'],
-        }
-    ), "Links": OrderedDict(
-        {
-            "Rjc": ["Case_side(" + case_side + ")", "Internal", "R", str(rjc) + "cel_per_w"],
-            "Rjb": ["Board_side(" + board_side + ")", "Internal", "R", str(rjb) + "cel_per_w"],
-        }
-    ), "SchematicData": ({})}
-
-    # Default material is Ceramic Material
-    ipk.modeler.primitives[object_handle.name].material_name = "Ceramic_material"
-
-    # Create boundary condition and set Solve Inside to No
-    bound = pyaedt.modules.Boundary.BoundaryObject(ipk, object_handle.name, props, "Network")
-    if bound.create():
-        ipk.boundaries.append(bound)
-        ipk.modeler.primitives[object_handle.name].solve_inside = False
-
+# Function definitions
 
 # Function to create a forced convection problem setup with default entries
 def forced_convection_setup(setup_name, flow_regime, turb_model='ZeroEquation'):
@@ -235,15 +234,15 @@ def assign_opening_boundary(name, face_id, flow_type,
             face ID of opening
         flow_type: str
             velocity or pressure
-        xvel: float, optional
+        xvel: str, optional
             velocity in x-direction
-        yvel: float, optional
+        yvel: str, optional
             velocity in y-direction
-        zvel: float, optional
+        zvel: str, optional
             velocity in z-direction
-        pressure: float, optional
+        pressure: str, optional
             pressure at opening boundary
-        temperature: float, optional
+        temperature: str, optional
             temperature at opening boundary
     """
     props = {"Faces": [face_id]}
@@ -299,55 +298,55 @@ def cleanup_files(proj_name):
 
 
 # Function to import ECAD
-def import_ecad(ecad_file_path, ecad_type):
-    ecad_file_name = os.path.basename(ecad_file_path)
-    ecad_file_name_no_ext = os.path.splitext(ecad_file_name)[0]
-
-    ecad_project_name = ecad_file_name_no_ext + '.aedt'
-    ecad_project_path = os.path.join(os.getcwd(), ecad_project_name)
-    ecad_project_name_no_ext = os.path.splitext(ecad_project_name)[0]
-
-    cleanup_files(ecad_project_name)
-
-    h3d = pyaedt.Hfss3dLayout()
-    if ecad_type == 'EDB Folder':
-        h3d.import_edb(ecad_file_path)
-    if ecad_type == 'ODB++ File':
-        h3d.import_odb(ecad_file_path)
-    if ecad_type == 'BRD File':
-        h3d.import_brd(ecad_file_path)
-
-    h3d.save_project()
-    ecad_design = h3d.design_list[0]
-
-    # Get name of outline polygon
-    outline_poly = []
-    for key in h3d.modeler.polygons.keys():
-        if h3d.modeler.polygons[key].placement_layer == 'Outline':
-            outline_poly.append(key)
-
-    ipk.create_pcb_from_3dlayout(component_name=ecad_file_name_no_ext,
-                                 project_name=ecad_project_path,
-                                 design_name=ecad_design,
-                                 close_linked_project_after_import=True,
-                                 extenttype='Polygon',
-                                 outlinepolygon=outline_poly[0],
-                                 resolution=3)
-
-    for i in ipk.design_list:
-        design = desktop.design_type(project_name=ipk.project_name, design_name=i)
-        if design != 'Icepak':
-            ipk.delete_design(i)
+# def import_ecad(file_path, ecadtype):
+#     file_name = os.path.basename(file_path)
+#     file_name_no_ext = os.path.splitext(file_name)[0]
+#
+#     proj_name = file_name_no_ext + '.aedt'
+#     proj_path = os.path.join(os.getcwd(), proj_name)
+#     # proj_name_no_ext = os.path.splitext(proj_name)[0]
+#
+#     cleanup_files(proj_name)
+#
+#     h3d = pyaedt.Hfss3dLayout()
+#     if ecadtype == 'EDB Folder':
+#         h3d.import_edb(file_path)
+#     if ecadtype == 'ODB++ File':
+#         h3d.import_odb(file_path)
+#     if ecadtype == 'BRD File':
+#         h3d.import_brd(file_path)
+#
+#     h3d.save_project()
+#     edesign = h3d.design_list[0]
+#
+#     # Get name of outline polygon
+#     out_poly = []
+#     for k in h3d.modeler.polygons.keys():
+#         if h3d.modeler.polygons[k].placement_layer == 'Outline':
+#             out_poly.append(k)
+#
+#     ipk.create_pcb_from_3dlayout(component_name=file_name_no_ext,
+#                                  project_name=proj_path,
+#                                  design_name=edesign,
+#                                  close_linked_project_after_import=True,
+#                                  extenttype='Polygon',
+#                                  outlinepolygon=out_poly[0],
+#                                  resolution=3)
+#
+#     for ipk_des in ipk.design_list:
+#         design = desktop.design_type(project_name=ipk.project_name, design_name=ipk_des)
+#         if design != 'Icepak':
+#             ipk.delete_design(ipk_des)
 
 
 def quit_aedt():
     ipk.save_project()
     pid = desktop.aedt_process_id
     os.kill(pid, signal.SIGTERM)
-    files = os.listdir(os.getcwd())
-    for file in files:
-        if file.endswith('.lock'):
-            os.remove(file)
+    file_list = os.listdir(os.getcwd())
+    for item in file_list:
+        if item.endswith('.lock'):
+            os.remove(item)
 
 
 # Fix blur issue in tkinter window panels
@@ -388,7 +387,7 @@ if workdir_button:
     root0.attributes("-topmost", True)
     root0.withdraw()
     try:
-        workdir = filedialog.askdirectory(master=root0)
+        workdir = fd.askdirectory(parent=root0, initialdir=os.getcwd(), title='Select Folder')
         st.session_state['workdir'] = workdir
     except RuntimeWarning:
         pass
@@ -410,11 +409,13 @@ if idf_button:
     root1.withdraw()
     try:
         if st.session_state['idf_type'] == '*.emn':
-            files = filedialog.askopenfilenames(master=root1, filetypes=[('EMN File', '*.emn')])
+            files = fd.askopenfilenames(parent=root1, initialdir=os.getcwd(), filetypes=[('EMN File', '*.emn')])
+            idf_file = os.path.basename(files[0])
+            st.session_state['idf_file'] = idf_file
         if st.session_state['idf_type'] == '*.bdf':
-            files = filedialog.askopenfilenames(master=root1, filetypes=[('BDF File', '*.bdf')])
-        idf_file = os.path.basename(files[0])
-        st.session_state['idf_file'] = idf_file
+            files = fd.askopenfilenames(parent=root1, initialdir=os.getcwd(), filetypes=[('BDF File', '*.bdf')])
+            idf_file = os.path.basename(files[0])
+            st.session_state['idf_file'] = idf_file
     except RuntimeWarning:
         pass
 
@@ -432,15 +433,13 @@ if ecad_button:
     root2.withdraw()
     try:
         if st.session_state['ecad_type'] == 'EDB Folder':
-            ecad_file = filedialog.askdirectory(master=root2, initialdir=os.getcwd())
+            ecad_file = fd.askdirectory(parent=root2, initialdir=os.getcwd())
             st.session_state['ecad_file'] = ecad_file
         elif st.session_state['ecad_type'] == 'ODB++ File':
-            ecad_file = filedialog.askopenfilename(master=root2, filetypes=[('TGZ File', '*.tgz')],
-                                                   initialdir=os.getcwd())
+            ecad_file = fd.askopenfilename(parent=root2, initialdir=os.getcwd(), filetypes=[('TGZ File', '*.tgz')])
             st.session_state['ecad_file'] = ecad_file
         elif st.session_state['ecad_type'] == 'BRD File':
-            ecad_file = filedialog.askopenfilename(master=root2, filetypes=[('BRD File', '*.brd')],
-                                                   initialdir=os.getcwd())
+            ecad_file = fd.askopenfilename(parent=root2, initialdir=os.getcwd(), filetypes=[('BRD File', '*.brd')])
             st.session_state['ecad_file'] = ecad_file
         else:
             st.error('Something went wrong!')
@@ -459,9 +458,8 @@ if bc_file_button:
     root3.attributes("-topmost", True)
     root3.withdraw()
     try:
-        bc_file = filedialog.askopenfilenames(master=root3,
-                                              filetypes=[('Microsoft Excel Comma Separated Values File', '*.csv')],
-                                              initialdir=os.getcwd())
+        bc_file = fd.askopenfilenames(parent=root3, initialdir=os.getcwd(),
+                                      filetypes=[('Microsoft Excel Comma Separated Values File', '*.csv')])
         bc_filename = os.path.basename(bc_file[0])
         st.session_state['bc_filename'] = bc_filename
     except RuntimeWarning:
@@ -480,8 +478,8 @@ if include_matfile:
         root4.attributes("-topmost", True)
         root4.withdraw()
         try:
-            materials_file = filedialog.askopenfilenames(master=root4, filetypes=[
-                ('Microsoft Excel Comma Separated Values File', '*.csv')], initialdir=os.getcwd())
+            materials_file = fd.askopenfilenames(parent=root4, initialdir=os.getcwd(), filetypes=[
+                ('Microsoft Excel Comma Separated Values File', '*.csv')])
             materials_filename = os.path.basename(materials_file[0])
             st.session_state['materials_filename'] = materials_filename
         except RuntimeWarning:
@@ -537,17 +535,23 @@ st.markdown('**Solution Settings**')
 conv_type = st.selectbox('Select convection mode:', ('Forced', 'Natural'))
 
 conv_cond = False
+air_temp = str(20.0)
+vel_dir = '+X'
+vel = 0.0
+gravity_direction = '+Z'
 
 if conv_type == 'Forced':
     col11, col12 = st.columns(2)
     vel = col11.text_input('Velocity Magnitude [m/s]:')
     vel_dir = col12.selectbox('Direction:', ('+X', '-X', '+Y', '-Y', '+Z', '-Z'))
     Tin = st.text_input('Inlet Temperature [C]:')
+    air_temp = Tin
     conv_cond = True
 
 if conv_type == 'Natural':
     gravity_direction = st.selectbox('Direction of gravity:', ('+X', '-X', '+Y', '-Y', '+Z', '-Z'))
     Tamb = st.text_input('Ambient Temperature [C]:')
+    air_temp = Tamb
     conv_cond = True
 
 # Mesh Settings
@@ -573,14 +577,9 @@ if analyze_setup:
 else:
     sim_button_text = '**Setup Only**'
 setup_analyze = st.button(sim_button_text)
-
-if conv_type == 'Forced':
-    air_temp = Tin
-else:
-    air_temp = Tamb
-
 placeholder = st.empty()
 analysis_complete = False
+analysis_setup = 'Icepak_Analysis'
 
 if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session_state['bc_filename'] \
         and conv_cond and air_temp and project_name:
@@ -659,11 +658,10 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         ipk.create_pcb_from_3dlayout(component_name=ecad_file_name_no_ext,
                                      project_name=None,
                                      design_name=ecad_design,
-                                     close_linked_project_after_import=False,
-                                     extenttype='Polygon',
-                                     outlinepolygon=outline_poly[0],
-                                     resolution=3)
-
+                                     resolution=3,
+                                     extent_type='Polygon',
+                                     outline_polygon=outline_poly[0],
+                                     close_linked_project_after_import=False)
         # Import IDF file
         ipk.import_idf(board_filename)
 
@@ -686,7 +684,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
             ipk.modeler.points[i].delete()
 
         # Import Modified CSV file 
-        fields = []
+        # fields = []
         rows = []
         with open(bc_filename, 'r') as csvFile:
             csvReader = csv.reader(csvFile)
@@ -696,7 +694,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
 
         if st.session_state['materials_filename']:
             # Read material properties file
-            fields_mat = []
+            # fields_mat = []
             rows_mat = []
             with open(materials_filename, 'r', encoding='utf-8-sig') as matFile:
                 csvReader = csv.reader(matFile)
@@ -720,7 +718,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         bottom_components = []
         for i in range(len(rows)):
             if rows[i][3] != 'NOREFDES':
-                block_name = re.sub("\W", "_", rows[i][3])
+                block_name = re.sub(r"\W", "_", rows[i][3])
                 if rows[i][6] == 'TOP':
                     top_components.append(block_name)
                 if rows[i][6] == 'BOTTOM':
@@ -751,15 +749,21 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         mon_point_list = []
         for i in range(len(rows)):
             if rows[i][3] != 'NOREFDES':
-                block_name = re.sub("\W", "_", rows[i][3])
+                block_name = re.sub(r"\W", "_", rows[i][3])
                 block_handle = ipk.modeler.get_object_from_name(block_name)
+                pcb_top_layer = ipk.modeler.get_object_from_name(pcb_layers[0])
+                pcb_bottom_layer = ipk.modeler.get_object_from_name(pcb_layers[-1])
                 board = "IDF_BoardOutline"
-                block_board_side = block_handle.get_touching_faces(board)
+                if block_handle.get_touching_faces(pcb_top_layer):
+                    block_board_side = block_handle.get_touching_faces(pcb_top_layer)
+                else:
+                    block_board_side = block_handle.get_touching_faces(pcb_bottom_layer)
+                # block_board_side = block_handle.get_touching_faces(board)
                 point_name = 'point_' + block_name
 
                 if rows[i][11] == 'YES':
                     mon_point = ipk.modeler.primitives.get_face_center(block_board_side[0].id)
-                    ipk.modeler.primitives.create_point(mon_point, point_name)
+                    # ipk.modeler.primitives.create_point(mon_point, point_name)
                     mon_point_list.append(point_name)
                     ipk.assign_point_monitor(mon_point, monitor_type='Temperature', monitor_name=point_name)
 
@@ -773,7 +777,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         for i in range(len(rows)):
             if rows[i][0] == 'NO':
                 if rows[i][3] != 'NOREFDES':
-                    block_name = re.sub("\W", "_", rows[i][3])
+                    block_name = re.sub(r"\W", "_", rows[i][3])
                     block_handle = ipk.modeler.get_object_from_name(block_name)
                     if delete_filtered:
                         ipk.modeler.delete(block_handle.name)
@@ -784,7 +788,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         for i in range(len(rows)):
             if rows[i][0] == 'YES':
                 if rows[i][3] != 'NOREFDES':
-                    block_name = re.sub("\W", "_", rows[i][3])
+                    block_name = re.sub(r"\W", "_", rows[i][3])
                     block_handle = ipk.modeler.get_object_from_name(block_name)
                     if rows[i][7] == "block":
                         if rows[i][8] != 0:
@@ -795,14 +799,16 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                             block_handle.material_name = rows[i][12]
                             block_handle.surface_material_name = 'Ceramic-surface'
                     elif rows[i][7] == "network":
-                        if rows[i][6] == 'TOP':
-                            board_side = 'minz'
-                        else:
-                            board_side = 'maxz'
+                        # if rows[i][6] == 'TOP':
+                        #     board_side = 'minz'
+                        # else:
+                        #     board_side = 'maxz'
                         # if rows[i][4] == 'BOTTOM':
                         #     board_side == 'maxz'
-                        create_2R_network_BC(block_handle, rows[i][8], rows[i][9], rows[i][10], board_side)
-                    elif rows[i][7] == "hollow":
+                        # create_2R_network_BC(block_handle, rows[i][8], rows[i][9], rows[i][10], board_side)
+                        ipk.create_two_resistor_network_block(object_name=block_name, pcb=pcb[0], power=rows[i][8]+"W",
+                                                              rjb=rows[i][9], rjc=rows[i][10])
+                    elif rows[i][5] == "hollow":
                         ipk.create_source_block(block_name, rows[i][8] + "W", assign_material=False,
                                                 use_object_for_name=True)
                         ipk.modeler.primitives[block_name].solve_inside = False
@@ -825,6 +831,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
             # Assign velocity inlet and pressure outlet boundary conditions
             region = ipk.modeler.primitives["Region"]
             if vel_dir == '+X':
+                ipk.modeler.edit_region_dimensions([100, 100, 50, 50, 50, 50])
                 inlet_opening_face_id = region.bottom_face_x.id
                 outlet_opening_face_id = region.top_face_x.id
                 speed = str(vel) + 'm_per_sec'
@@ -832,8 +839,8 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                 assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', xvel=speed,
                                         temperature=air_temp)
                 assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-                ipk.modeler.edit_region_dimensions([100, 100, 50, 50, 50, 50])
             elif vel_dir == '-X':
+                ipk.modeler.edit_region_dimensions([100, 100, 50, 50, 50, 50])
                 inlet_opening_face_id = region.top_face_x.id
                 outlet_opening_face_id = region.bottom_face_x.id
                 speed = str(vel) + 'm_per_sec'
@@ -841,8 +848,8 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                 assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', xvel=speed,
                                         temperature=air_temp)
                 assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-                ipk.modeler.edit_region_dimensions([100, 100, 50, 50, 50, 50])
             elif vel_dir == '+Y':
+                ipk.modeler.edit_region_dimensions([50, 50, 100, 100, 50, 50])
                 inlet_opening_face_id = region.bottom_face_y.id
                 outlet_opening_face_id = region.top_face_y.id
                 speed = str(vel) + 'm_per_sec'
@@ -850,8 +857,8 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                 assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', yvel=speed,
                                         temperature=air_temp)
                 assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-                ipk.modeler.edit_region_dimensions([50, 50, 100, 100, 50, 50])
             elif vel_dir == '-Y':
+                ipk.modeler.edit_region_dimensions([50, 50, 100, 100, 50, 50])
                 inlet_opening_face_id = region.top_face_y.id
                 outlet_opening_face_id = region.bottom_face_y.id
                 speed = str(vel) + 'm_per_sec'
@@ -859,8 +866,8 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                 assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', yvel=speed,
                                         temperature=air_temp)
                 assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-                ipk.modeler.edit_region_dimensions([50, 50, 100, 100, 50, 50])
             elif vel_dir == '+Z':
+                ipk.modeler.edit_region_dimensions([50, 50, 50, 50, 100, 100])
                 inlet_opening_face_id = region.bottom_face_z.id
                 outlet_opening_face_id = region.top_face_z.id
                 speed = str(vel) + 'm_per_sec'
@@ -868,8 +875,8 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                 assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', zvel=speed,
                                         temperature=air_temp)
                 assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-                ipk.modeler.edit_region_dimensions([50, 50, 50, 50, 100, 100])
             else:
+                ipk.modeler.edit_region_dimensions([50, 50, 50, 50, 100, 100])
                 inlet_opening_face_id = region.top_face_z.id
                 outlet_opening_face_id = region.bottom_face_z.id
                 speed = str(vel) + 'm_per_sec'
@@ -877,7 +884,6 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                 assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', zvel=speed,
                                         temperature=air_temp)
                 assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-                ipk.modeler.edit_region_dimensions([50, 50, 50, 50, 100, 100])
 
         if conv_type == 'Natural':
             analysis_setup = 'natural_conv_setup'
@@ -914,6 +920,9 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                 args.append(prio)
                 priority_num = priority_num + 1
         ipk.modeler.oeditor.UpdatePriorityList(args)
+
+        # Clear Desktop messages
+        desktop.clear_messages()
 
         # Validation Check for Icepak design
         # ipk.odesign.ValidateDesign()
@@ -980,8 +989,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         mesh_y = mesh_mult_xy * (ty[1][max_val_index_y] + ty[1][max_val_index_y + 1])
         mesh_z = mesh_mult_z * min(dim_z)
 
-        # Find extent of all objects
-        # in z-direction
+        # Find extent of all objects in z-direction
         minzs = []
         maxzs = []
         for i in primitive_objects:

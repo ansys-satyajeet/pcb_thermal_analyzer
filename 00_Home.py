@@ -2,7 +2,7 @@ import streamlit as st
 
 st.set_page_config(layout="centered", page_icon="🌡️", page_title="PCB Thermal Analyzer")
 
-st.title('🌡️PCB Thermal Analyzer ')
+st.title('🌡️PCB Thermal Analyzer')
 
 
 st.markdown('''PCB Thermal Analyzer is a fully automated web application to predict temperature distribution on a 

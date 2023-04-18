@@ -49,7 +49,7 @@ if workdir_button:
     root0.attributes("-topmost", True)
     root0.withdraw()
     try:
-        workdir = filedialog.askdirectory(master=root0)
+        workdir = filedialog.askdirectory(initialdir=os.getcwd())
         st.session_state['workdir'] = workdir
     except RuntimeWarning:
         pass
@@ -76,11 +76,15 @@ if idf_button:
     root1.withdraw()
     try:
         if idf_type == '*.emn':
-            files = filedialog.askopenfilenames(master=root1, filetypes=[('EMN File', '*.emn')])
+            files = filedialog.askopenfilenames(parent=root1,
+                                                filetypes=[('EMN File', '*.emn')])
+            idf_file = os.path.basename(files[0])
+            st.session_state['idf_file'] = idf_file
         if idf_type == '*.bdf':
-            files = filedialog.askopenfilenames(master=root1, filetypes=[('BDF File', '*.bdf')])
-        idf_file = os.path.basename(files[0])
-        st.session_state['idf_file'] = idf_file
+            files = filedialog.askopenfilenames(parent=root1,
+                                                filetypes=[('BDF File', '*.bdf')])
+            idf_file = os.path.basename(files[0])
+            st.session_state['idf_file'] = idf_file
     except RuntimeWarning:
         pass
 
@@ -104,7 +108,7 @@ if include_matfile:
         root2.attributes("-topmost", True)
         root2.withdraw()
         try:
-            files = filedialog.askopenfilenames(master=root2,
+            files = filedialog.askopenfilenames(parent=root2,
                                                 filetypes=[('Microsoft Excel Comma Separated Values File', '*.csv')])
             mat_csvfile = os.path.basename(files[0])
             st.session_state['mat_csvfile'] = mat_csvfile
@@ -239,7 +243,7 @@ if st.session_state['idf_csv_file']:
 
     gb = GridOptionsBuilder.from_dataframe(st.session_state['dataframe'])
     gb.configure_default_column(editable=True)
-    gb.configure_grid_options(domLayout='normal')
+    # gb.configure_grid_options(domLayout='normal')
     gb.configure_column('Include', editable=True, cellEditor='agSelectCellEditor',
                         cellEditorParams={'values': include_dropdownlist}, singleClickEdit=True)
     gb.configure_column('Package_Name', editable=False)
