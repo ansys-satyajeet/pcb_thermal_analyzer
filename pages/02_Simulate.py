@@ -9,7 +9,6 @@ from ctypes import windll
 import streamlit as st
 import tkinter as tk
 from tkinter import filedialog as fd
-# from collections import OrderedDict
 
 st.set_page_config(layout="centered", page_icon="🌡️", page_title="PCB Thermal Analyzer")
 st.title('🖥️Simulate')
@@ -378,6 +377,8 @@ if 'workdir' not in st.session_state:
 if 'pid' not in st.session_state:
     st.session_state['pid'] = False
 
+# Get working directory from Windows Explorer dialog box
+#
 c1, c2 = st.columns([3, 1])
 c1.write('Select working directory:')
 workdir_button = c2.button('Select Folder')
@@ -395,7 +396,7 @@ if workdir_button:
 if st.session_state['workdir']:
     os.chdir(st.session_state['workdir'])
 
-# Read board file from Windows Explorer dialog box
+# Read IDF board file from Windows Explorer dialog box
 # 
 col01, col02, col03 = st.columns([2, 1, 1])
 col01.write('Select IDF Board file type:')
@@ -569,18 +570,20 @@ mode = col14.radio('Mode:', ('Graphical', 'Non-Graphical'))
 project_name = st.text_input('Enter Project Name:',
                              help='Only letters (A-Z,a-z), numbers (0-9) and underscores are allowed.')
 
-aedt_version = st.selectbox('Select AEDT release:', ('2022 R2', '2023 R1'))
+aedt_version = st.selectbox('Select AEDT release:', ('2023 R1', '2023 R2'))
 
 analyze_setup = st.checkbox('Setup problem and proceed to solve')
 if analyze_setup:
     sim_button_text = '**Simulate**'
 else:
     sim_button_text = '**Setup Only**'
-setup_analyze = st.button(sim_button_text)
+setup_analyze_button = st.button(sim_button_text)
 placeholder = st.empty()
 analysis_complete = False
 analysis_setup = 'Icepak_Analysis'
 
+# Main Code Execution
+#
 if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session_state['bc_filename'] \
         and conv_cond and air_temp and project_name:
     placeholder.success('The setup is ready for analysis', icon="✅")
@@ -601,7 +604,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
     # Launch new AEDT Icepak session
     project_name = project_name + '.aedt'
     project_path = os.path.join(os.getcwd(), project_name)
-    if setup_analyze:
+    if setup_analyze_button:
         aedt_release = re.sub(' R', '.', aedt_version)
         cleanup_files(project_name)
         placeholder.info('AEDT Icepak session in progress...', icon="🏃🏽")
@@ -642,6 +645,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
             if i != ecad_file_name_no_ext:
                 desktop.odesktop.DeleteProject(i)
 
+        # ECAD design name from HFSS 3D Layout
         ecad_design = h3d.design_list[0]
 
         # Get name of outline polygon
@@ -650,11 +654,12 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
             if h3d.modeler.polygons[key].placement_layer == 'Outline':
                 outline_poly.append(key)
 
+        # Insert Icepak design and rename project to user-specified project name
         ipk = pyaedt.Icepak()
         ipk.save_project()
         ipk.oproject.Rename(os.path.join(ipk.project_path, project_name), True)
 
-        # Create PCB object in Icepak
+        # Create PCB object in Icepak from HFSS 3D Layout
         ipk.create_pcb_from_3dlayout(component_name=ecad_file_name_no_ext,
                                      project_name=None,
                                      design_name=ecad_design,
@@ -662,7 +667,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                                      extent_type='Polygon',
                                      outline_polygon=outline_poly[0],
                                      close_linked_project_after_import=False)
-        # Import IDF file
+        # Import IDF file into Icepak
         ipk.import_idf(board_filename)
 
         # Fit all and save
@@ -683,8 +688,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         for i in ipk.modeler.points:
             ipk.modeler.points[i].delete()
 
-        # Import Modified CSV file 
-        # fields = []
+        # Import Modified CSV file
         rows = []
         with open(bc_filename, 'r') as csvFile:
             csvReader = csv.reader(csvFile)
@@ -692,9 +696,8 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
             for row in csvReader:
                 rows.append(row)
 
+        # Read material properties file (if provided)
         if st.session_state['materials_filename']:
-            # Read material properties file
-            # fields_mat = []
             rows_mat = []
             with open(materials_filename, 'r', encoding='utf-8-sig') as matFile:
                 csvReader = csv.reader(matFile)
@@ -799,13 +802,6 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                             block_handle.material_name = rows[i][12]
                             block_handle.surface_material_name = 'Ceramic-surface'
                     elif rows[i][7] == "network":
-                        # if rows[i][6] == 'TOP':
-                        #     board_side = 'minz'
-                        # else:
-                        #     board_side = 'maxz'
-                        # if rows[i][4] == 'BOTTOM':
-                        #     board_side == 'maxz'
-                        # create_2R_network_BC(block_handle, rows[i][8], rows[i][9], rows[i][10], board_side)
                         ipk.create_two_resistor_network_block(object_name=block_name, pcb=pcb[0], power=rows[i][8]+"W",
                                                               rjb=rows[i][9], rjc=rows[i][10])
                     elif rows[i][5] == "hollow":
@@ -923,26 +919,6 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
 
         # Clear Desktop messages
         desktop.clear_messages()
-
-        # Validation Check for Icepak design
-        # ipk.odesign.ValidateDesign()
-        # x = ipk.odesktop.GetMessages(ipk.project_name, ipk.design_name, 2)
-        # desktop.clear_messages()
-        # intersecting_objs = re.findall('Parts\s"(.*?)"\sand\s"(.*?)"\sintersect', ''.join(x))
-        # p = 2
-        # for i in intersecting_objs:
-        #     obj_list = [i[0]]
-        #     p = p + 1
-        #     ipk.mesh.add_priority(1,obj_list,"None",p)
-        # ipk.save_project()
-
-        # List of objects
-        # list_of_objects = ipk.modeler.solid_bodies
-        # model_objects = []
-        # for i in list_of_objects:
-        #     obj_handle = ipk.modeler.get_object_from_name(i)
-        #     if obj_handle.model == True:
-        #         model_objects.append(i)
         model_objects = ipk.modeler.model_objects
         model_objects.remove('Region')
 
@@ -963,7 +939,6 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
 
         pcb_dim_x = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_dimension[0]
         pcb_dim_y = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_dimension[1]
-        # pcb_dim_z = sum(dim_z)
         pcb_min_x = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_box[0]
         pcb_min_y = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_box[1]
         pcb_max_x = ipk.modeler.get_object_from_name(pcb_layers[0]).bounding_box[3]
@@ -1050,9 +1025,6 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
 
         # Global mesh dimensions
         domain = ipk.modeler.get_bounding_dimension()
-        # global_max_x = domain[0]/25
-        # global_max_y = domain[1]/25
-        # global_max_z = domain[2]/25
         global_max_x = 4 * mesh_x
         global_max_y = 4 * mesh_y
         global_max_z = 4 * mesh_z
