@@ -62,7 +62,7 @@ def forced_convection_setup(setup_name, flow_regime, turb_model='ZeroEquation'):
     setup.props['Discretization Scheme - Temperature'] = 'First'
     setup.props['Secondary Gradient'] = False
     setup.props['Sequential Solve of Flow and Energy Equations'] = True
-    setup.props['Convergence Criteria - Max Iterations'] = 250
+    setup.props['Convergence Criteria - Max Iterations'] = 300
     setup.update()
 
 
@@ -151,7 +151,7 @@ def natural_convection_setup(setup_name, gravity_dir, flow_regime, turb_model='Z
     setup.props['Linear Solver Type - Momentum'] = 'flex'
     setup.props['Linear Solver Type - Temperature'] = 'F'
     setup.props['Sequential Solve of Flow and Energy Equations'] = False
-    setup.props['Convergence Criteria - Max Iterations'] = 250
+    setup.props['Convergence Criteria - Max Iterations'] = 500
     setup.update()
 
 
@@ -271,7 +271,6 @@ if 'pid' not in st.session_state:
     st.session_state['pid'] = False
 
 # Get working directory from Windows Explorer dialog box
-#
 c1, c2 = st.columns([3, 1])
 c1.write('Select working directory:')
 workdir_button = c2.button('Select Folder')
@@ -290,7 +289,6 @@ if st.session_state['workdir']:
     os.chdir(st.session_state['workdir'])
 
 # Read IDF board file from Windows Explorer dialog box
-# 
 col01, col02, col03 = st.columns([2, 1, 1])
 col01.write('Select IDF Board file type:')
 st.session_state['idf_type'] = col02.selectbox('Select IDF Board file type:', ('*.emn', '*.bdf'),
@@ -314,7 +312,6 @@ if idf_button:
         pass
 
 # Read ECAD file from Windows Explorer dialog box
-#
 col04, col05, col06 = st.columns([2, 1, 1])
 col04.write('Please select ECAD file type:')
 st.session_state['ecad_type'] = col05.selectbox('Select ECAD type:', ('EDB Folder', 'ODB++ File', 'BRD File'),
@@ -341,7 +338,6 @@ if ecad_button:
         pass
 
 # Read Boundary Conditions CSV file from Windows Explorer dialog box
-#
 col07, col08 = st.columns([3, 1])
 col07.write('Please select boundary conditions CSV file:')
 bc_file_button = col08.button('Select BC CSV file')
@@ -360,7 +356,6 @@ if bc_file_button:
         pass
 
 # Read material file from Windows Explorer dialog box
-#
 include_matfile = st.checkbox('Read Materials as CSV File?')
 if include_matfile:
     col09, col10 = st.columns([3, 1])
@@ -640,34 +635,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         else:
             ipk.modeler.move(objid=bottom_components, vector=[0, 0, move_bottom])
 
-        # # Create monitor points
-        # points_list = []
-        # mon_point_list = []
-        # for i in range(len(rows)):
-        #     if rows[i][3] != 'NOREFDES':
-        #         block_name = re.sub(r"\W", "_", rows[i][3])
-        #         block_handle = ipk.modeler.get_object_from_name(block_name)
-        #         pcb_top_layer = ipk.modeler.get_object_from_name(pcb_layers[0])
-        #         pcb_bottom_layer = ipk.modeler.get_object_from_name(pcb_layers[-1])
-        #         board = "IDF_BoardOutline"
-        #         if block_handle.get_touching_faces(pcb_top_layer):
-        #             block_board_side = block_handle.get_touching_faces(pcb_top_layer)
-        #         else:
-        #             block_board_side = block_handle.get_touching_faces(pcb_bottom_layer)
-        #         # block_board_side = block_handle.get_touching_faces(board)
-        #         point_name = 'point_' + block_name
-        #
-        #         if rows[i][11] == 'YES':
-        #             mon_point = ipk.modeler.primitives.get_face_center(block_board_side[0].id)
-        #             # ipk.modeler.primitives.create_point(mon_point, point_name)
-        #             mon_point_list.append(point_name)
-        #             ipk.assign_point_monitor(mon_point, monitor_type='Temperature', monitor_name=point_name)
-        #
-        #         if all_points:
-        #             if point_name not in ipk.modeler.point_names:
-        #                 mon_point = ipk.modeler.primitives.get_face_center(block_board_side[0].id)
-        #                 ipk.modeler.primitives.create_point(mon_point, point_name)
-        #                 points_list.append(point_name)
+        # Create dictionary of points at board side of all components
         points_dict = {}
         for i in range(len(rows)):
             if rows[i][3] != 'NOREFDES':
@@ -683,7 +651,6 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
                 if all_points:
                     mon_point = ipk.modeler.primitives.get_face_center(block_board_side[0].id)
                     points_dict[point_name] = mon_point
-                    # ipk.modeler.primitives.create_point(mon_point, point_name)
 
         # Delete filtered objects or make them non-model
         for i in range(len(rows)):
@@ -724,143 +691,6 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         # Clear Desktop messages
         desktop.clear_messages()
 
-        # Insert forced convection setup
-        # if conv_type == 'Forced':
-        #     analysis_setup = 'forced_conv_setup'
-        #     forced_convection_setup(analysis_setup, 'Turbulent')
-        #
-        #     # Assign velocity inlet and pressure outlet boundary conditions
-        #     region = ipk.modeler.primitives["Region"]
-        #     if vel_dir == '+X':
-        #         ipk.modeler.edit_region_dimensions([100, 100, 50, 50, 50, 50])
-        #         inlet_opening_face_id = region.bottom_face_x.id
-        #         outlet_opening_face_id = region.top_face_x.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', xvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #     elif vel_dir == '-X':
-        #         ipk.modeler.edit_region_dimensions([100, 100, 50, 50, 50, 50])
-        #         inlet_opening_face_id = region.top_face_x.id
-        #         outlet_opening_face_id = region.bottom_face_x.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', xvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #     elif vel_dir == '+Y':
-        #         ipk.modeler.edit_region_dimensions([50, 50, 100, 100, 50, 50])
-        #         inlet_opening_face_id = region.bottom_face_y.id
-        #         outlet_opening_face_id = region.top_face_y.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', yvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #     elif vel_dir == '-Y':
-        #         ipk.modeler.edit_region_dimensions([50, 50, 100, 100, 50, 50])
-        #         inlet_opening_face_id = region.top_face_y.id
-        #         outlet_opening_face_id = region.bottom_face_y.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', yvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #     elif vel_dir == '+Z':
-        #         ipk.modeler.edit_region_dimensions([50, 50, 50, 50, 100, 100])
-        #         inlet_opening_face_id = region.bottom_face_z.id
-        #         outlet_opening_face_id = region.top_face_z.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', zvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #     else:
-        #         ipk.modeler.edit_region_dimensions([50, 50, 50, 50, 100, 100])
-        #         inlet_opening_face_id = region.top_face_z.id
-        #         outlet_opening_face_id = region.bottom_face_z.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', zvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #
-        # if conv_type == 'Natural':
-        #     analysis_setup = 'natural_conv_setup'
-        #     natural_convection_setup(analysis_setup, gravity_dir=gravity_direction, flow_regime='Turbulent',
-        #                              ambient_temp=air_temp)
-        #     for i in ipk.modeler.get_object_faces('Region'):
-        #         outlet_name = 'outlet_' + str(i)
-        #         assign_opening_boundary(outlet_name, i, flow_type='pressure')
-
-        # # Assign BCs
-        # for i in range(len(rows)):
-        #     if rows[i][0] == 'YES':
-        #         if rows[i][3] != 'NOREFDES':
-        #             block_name = re.sub(r"\W", "_", rows[i][3])
-        #             block_handle = ipk.modeler.get_object_from_name(block_name)
-        #             if rows[i][7] == "block":
-        #                 if rows[i][8] != 0:
-        #                     ipk.create_source_block(block_name, rows[i][8] + "W", assign_material=False,
-        #                                             use_object_for_name=True)
-        #                 # Assign material property
-        #                 if rows[i][12] != "":
-        #                     block_handle.material_name = rows[i][12]
-        #                     block_handle.surface_material_name = 'Ceramic-surface'
-        #             elif rows[i][7] == "network":
-        #                 ipk.create_two_resistor_network_block(object_name=block_name, pcb=pcb[0],
-        #                                                       power=rows[i][8] + "W",
-        #                                                       rjb=rows[i][9], rjc=rows[i][10])
-        #             elif rows[i][7] == "hollow":
-        #                 ipk.create_source_block(block_name, rows[i][8] + "W", assign_material=False,
-        #                                         use_object_for_name=True)
-        #                 ipk.modeler.primitives[block_name].solve_inside = False
-        #             else:
-        #                 e = RuntimeError('Error! Incorrect block boundary condition.')
-        #                 st.exception(e)
-
-        # def name_cleanup(name):
-        #     return re.sub(r"\W", "_", name)
-        #
-        #
-        # colnames = ['Include', 'Package_Name', 'Part_Name', 'Instance_Name', 'Designator_Type', 'Height [mm]',
-        #             'Placement', 'BC_Type', 'Power [W]', 'R_jb [C/W]', 'R_jc [C/W]', 'Monitor_Point', 'Material']
-        # df = pd.DataFrame(rows, columns=colnames)
-        # df2 = df.copy()
-        # df2 = df2[(df2['Include'] == 'YES')]
-        # df2 = df2[(df2['Instance_Name'] != 'NOREFDES')]
-        # df3 = pd.DataFrame()
-        # df3['block_name'] = df2.apply(lambda x: name_cleanup(x.Instance_Name), axis=1)
-        # df3['bc_type'] = df2['BC_Type']
-        # df3['power'] = df2['Power [W]']
-        # df3['rjb'] = df2['R_jb [C/W]']
-        # df3['rjc'] = df2['R_jc [C/W]']
-        # df3['monpt'] = df2['Monitor_Point']
-        # df3['mat_type'] = df2['Material']
-        #
-        # for ind in df3.index:
-        #     block_handle = ipk.modeler.get_object_from_name(df3['block_name'][ind])
-        #     if df3['bc_type'][ind] == "block":
-        #         if df3['power'][ind] != 0:
-        #             ipk.create_source_block(df3['block_name'][ind], df3['power'][ind] + "W", assign_material=False,
-        #                                     use_object_for_name=True)
-        #         # Assign material property
-        #         if df3['mat_type'][ind] != "":
-        #             block_handle.material_name = df3['mat_type'][ind]
-        #             block_handle.surface_material_name = 'Ceramic-surface'
-        #     elif df3['bc_type'][ind] == "network":
-        #         ipk.create_two_resistor_network_block(object_name=df3['block_name'][ind], pcb=pcb[0],
-        #                                               power=df3['power'][ind] + "W",
-        #                                               rjb=df3['rjb'][ind], rjc=df3['rjc'][ind])
-        #     elif df3['bc_type'][ind] == "hollow":
-        #         ipk.create_source_block(df3['block_name'][ind], df3['power'][ind] + "W", assign_material=False,
-        #                                 use_object_for_name=True)
-        #         ipk.modeler.primitives[df3['block_name'][ind]].solve_inside = False
-        #     else:
-        #         e = RuntimeError('Error! Incorrect block boundary condition.')
-        #         st.exception(e)
-
         # Save project
         ipk.save_project()
 
@@ -871,103 +701,7 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
         # Clear Desktop messages
         desktop.clear_messages()
 
-        # # Insert forced convection setup
-        # if conv_type == 'Forced':
-        #     analysis_setup = 'forced_conv_setup'
-        #     forced_convection_setup(analysis_setup, 'Turbulent')
-        #
-        #     # Assign velocity inlet and pressure outlet boundary conditions
-        #     region = ipk.modeler.primitives["Region"]
-        #     if vel_dir == '+X':
-        #         ipk.modeler.edit_region_dimensions([100, 100, 50, 50, 50, 50])
-        #         inlet_opening_face_id = region.bottom_face_x.id
-        #         outlet_opening_face_id = region.top_face_x.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', xvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #     elif vel_dir == '-X':
-        #         ipk.modeler.edit_region_dimensions([100, 100, 50, 50, 50, 50])
-        #         inlet_opening_face_id = region.top_face_x.id
-        #         outlet_opening_face_id = region.bottom_face_x.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', xvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #     elif vel_dir == '+Y':
-        #         ipk.modeler.edit_region_dimensions([50, 50, 100, 100, 50, 50])
-        #         inlet_opening_face_id = region.bottom_face_y.id
-        #         outlet_opening_face_id = region.top_face_y.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', yvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #     elif vel_dir == '-Y':
-        #         ipk.modeler.edit_region_dimensions([50, 50, 100, 100, 50, 50])
-        #         inlet_opening_face_id = region.top_face_y.id
-        #         outlet_opening_face_id = region.bottom_face_y.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', yvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #     elif vel_dir == '+Z':
-        #         ipk.modeler.edit_region_dimensions([50, 50, 50, 50, 100, 100])
-        #         inlet_opening_face_id = region.bottom_face_z.id
-        #         outlet_opening_face_id = region.top_face_z.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', zvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #     else:
-        #         ipk.modeler.edit_region_dimensions([50, 50, 50, 50, 100, 100])
-        #         inlet_opening_face_id = region.top_face_z.id
-        #         outlet_opening_face_id = region.bottom_face_z.id
-        #         speed = str(vel) + 'm_per_sec'
-        #         air_temp = str(air_temp) + 'cel'
-        #         assign_opening_boundary('inlet', inlet_opening_face_id, flow_type='velocity', zvel=speed,
-        #                                 temperature=air_temp)
-        #         assign_opening_boundary('outlet', outlet_opening_face_id, flow_type='pressure')
-        #
-        # if conv_type == 'Natural':
-        #     analysis_setup = 'natural_conv_setup'
-        #     natural_convection_setup(analysis_setup, gravity_dir=gravity_direction, flow_regime='Turbulent',
-        #                              ambient_temp=air_temp)
-        #     for i in ipk.modeler.get_object_faces('Region'):
-        #         outlet_name = 'outlet_' + str(i)
-        #         assign_opening_boundary(outlet_name, i, flow_type='pressure')
-
-        # # Priority assignments based on volume of objects
-        # obj_dict = {}
-        # for i in ipk.modeler.solid_bodies:
-        #     if i != 'Region':
-        #         obj_dict[i] = ipk.modeler.get_object_from_name(i).volume
-        # vol_sorted_objs = sorted(obj_dict.items(), key=lambda x: x[1], reverse=True)
-        # vol_sorted_obj_list = []
-        # for i in vol_sorted_objs:
-        #     vol_sorted_obj_list.append(i[0])
-        #
-        # priority_num = 2
-        # args = ["NAME:UpdatePriorityListData"]
-        # for i in vol_sorted_obj_list:
-        #     if i != 'Region':
-        #         prio = [
-        #             "NAME:PriorityListParameters",
-        #             "EntityType:=", "Object",
-        #             "EntityList:=", i,
-        #             "PriorityNumber:=", priority_num,
-        #             "PriorityListType:=", "3D"
-        #         ]
-        #         args.append(prio)
-        #         priority_num = priority_num + 1
-        # ipk.modeler.oeditor.UpdatePriorityList(args)
-
-        # Clear Desktop messages
-        desktop.clear_messages()
+        # List all model objects in design
         model_objects = ipk.modeler.model_objects
         model_objects.remove('Region')
 
@@ -1218,33 +952,6 @@ if st.session_state['idf_file'] and st.session_state['ecad_file'] and st.session
             for i in ipk.modeler.get_object_faces('Region'):
                 outlet_name = 'outlet_' + str(i)
                 assign_opening_boundary(outlet_name, i, flow_type='pressure')
-
-        # Create monitor points
-        # points_list = []
-        # mon_point_list = []
-        # for i in range(len(rows)):
-        #     if rows[i][3] != 'NOREFDES':
-        #         block_name = re.sub(r"\W", "_", rows[i][3])
-        #         block_handle = ipk.modeler.get_object_from_name(block_name)
-        #         pcb_top_layer = ipk.modeler.get_object_from_name(pcb_layers[0])
-        #         pcb_bottom_layer = ipk.modeler.get_object_from_name(pcb_layers[-1])
-        #         if block_handle.get_touching_faces(pcb_top_layer):
-        #             block_board_side = block_handle.get_touching_faces(pcb_top_layer)
-        #         else:
-        #             block_board_side = block_handle.get_touching_faces(pcb_bottom_layer)
-        #         point_name = 'point_' + block_name
-        #
-        #         if rows[i][11] == 'YES':
-        #             mon_point = ipk.modeler.primitives.get_face_center(block_board_side[0].id)
-        #             # ipk.modeler.primitives.create_point(mon_point, point_name)
-        #             mon_point_list.append(point_name)
-        #             ipk.assign_point_monitor(mon_point, monitor_type='Temperature', monitor_name=point_name)
-        #
-        #         if all_points:
-        #             if point_name not in ipk.modeler.point_names:
-        #                 mon_point = ipk.modeler.primitives.get_face_center(block_board_side[0].id)
-        #                 ipk.modeler.primitives.create_point(mon_point, point_name)
-        #                 points_list.append(point_name)
 
         # Create monitor points at all object bases
         list_mon_pts = ipk.odesign.GetChildObject("Monitor").GetChildNames()

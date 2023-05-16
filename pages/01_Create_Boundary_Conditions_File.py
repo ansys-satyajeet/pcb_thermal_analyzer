@@ -198,7 +198,7 @@ if st.session_state['idf_file']:
             else:
                 destype.append('MISC')
 
-        df.insert(loc=4, column='Designator_Type', value=destype)
+        df.insert(loc=4, column='Designator_Type', value=pd.Series(destype))
 
         comp_hts = []
         with open(lib_file) as emp:
@@ -227,7 +227,7 @@ if st.session_state['idf_file']:
                 if i[1] == part_names[j]:
                     component_height[j] = float(i[2]) * 0.0254
 
-        df.insert(loc=5, column='Height [mm]', value=component_height)
+        df.insert(loc=5, column='Height [mm]', value=pd.Series(component_height))
 
         try:
             df.to_csv(st.session_state['idf_csv_file'], index=False)
